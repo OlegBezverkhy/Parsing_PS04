@@ -3,9 +3,14 @@ from selenium.webdriver import Keys
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
-import time
+from time import sleep
+import urllib.parse
 
 URL = 'https://ru.wikipedia.org/wiki/Заглавная_страница'
+
+WORD_IN_URL = 'Википедия'
+
+global depth
 
 
 def check_browser_and_launch():
@@ -29,7 +34,7 @@ def check_browser_and_launch():
         print('Найден браузер Firefox.')
         try:
             # Запуск Firefox через Selenium
-            current_browser = webdriver.Firefox()  # Убедитесь, что geckodriver доступен в PATH
+            current_browser = webdriver.Firefox()
             return current_browser
         except WebDriverException as er:
             print(f'Ошибка при запуске Firefox: {er}')
@@ -38,38 +43,126 @@ def check_browser_and_launch():
         return None
 
 
-def get_paragraphs(browser, url):
+def get_paragraphs(browser, url, depth):
+    ''' Печатает список параграфов на странице'''
+    print(f'Промотр параграфов на странице {urllib.parse.unquote(url)}')
     browser.get(url)
     # Пауза для загрузки страницы
-    time.sleep(2)
-    paragraphs = browser.find_elements(By.TAG_NAME, 'p')
+    sleep(4)
+    if depth == 0:
+        cl = 'searchResultImage-text'
+        paragraphs = browser.find_elements(By.CLASS_NAME, cl)
+    else:
+        paragraphs = browser.find_elements(By.TAG_NAME, 'p')
     for i, paragraph in enumerate(paragraphs):
-        print(f"Параграф {i + 1}: {paragraph.text}\n")
+        if paragraph.text != '':
+            print(f'Параграф {i + 1}:\n {paragraph.text}\n')
+            next_par = input('Нажмите <Enter> для просмотра следующего параграфа или <q> для выхода\n')
+            if next_par == 'q':
+                break
 
 
-def get_links(browser):
-    links = browser.find_elements(By.CSS_SELECTOR, 'a[href^="/wiki/"]')
-    return [link.get_attribute('href') for link in links]
+def get_links(browser, query):
+    ''' Находит и возвращает список связанных ссылок на сайте,
+    которые содеожат текст запроса'''
+    links = browser.find_elements(By.TAG_NAME, 'a')
+    return [link.get_attribute('href')
+            for link in links
+            if link.get_attribute('href') and query in link.text]
+
+
+def choice_action():
+    ''' Осуществляет выбор пользователем варианта действий из трех возможнных'''
+    choices = ('1', '2', '3')
+    while True:
+        print('Выберите варианты действий:')
+        print('1. Листать параграфы текущей статьи')
+        print('2. Перейти на одну из связанных страниц')
+        print('3. Выйти')
+        choice = input(' (1-3) >>>>  ')
+        if choice in choices:
+            return choice
+        else:
+            print('Неверный выбор. Попробуйте еще раз.')
+
+
+def input_query(browser, word):
+    '''Проверяет соответсвие фактически открытой странице ожидаемой. Просит
+    ввести запрос. Находит поле ввода на сайте, помещает туда текст запроса
+    и запускает поиск. В случае ошибки или ввода вместо запоса слова exit
+    завершает выполнение программы'''
+    if word in browser.title:
+        search_query = input('Введите запрос: ')
+        if search_query.lower() == 'exit':
+            exit(0)
+        # Находим окно поиска
+        search_box = browser.find_element(By.ID, 'searchInput')
+        search_box.send_keys(search_query)
+        search_box.send_keys(Keys.RETURN)
+        return search_query
+    else:
+        print('Ошибка обработки запроса')
+        exit(1)
+
+
+def list_links(browser, query):
+    links = get_links(browser, query)
+    if not links:
+        print('Нет связанных статей')
+        return
+    print(f'Найдено {len(links)} связанных статей:')
+    for i, link in enumerate(links):
+        print(f'{i + 1}. {urllib.parse.unquote(link)}')
+    return links
+
+
+def link_select(links):
+    ''' Возвращает выбранную ссылку'''
+    while True:
+        linked_choice = input('Введите номер статьи для перехода (или <q> для возврата): ')
+        try:
+            linked_index = int(linked_choice)-1
+            if 0 <= linked_index < len(links):
+                url_link = links[linked_index]
+                break
+            elif linked_choice.lower() == 'q':
+                return None
+            else:
+                print('Неверный ввод. Попробуйте снова.')
+        except ValueError:
+            print('Неверный ввод. Попробуйте снова.')
+    return url_link
+
+
+def menu(browser, query, url_link, depth):
+    if depth != 0:
+        browser.get(url_link)
+    while True:
+        choice = choice_action()
+        if choice == '1':
+            current_url = browser.current_url
+            get_paragraphs(browser, current_url, depth)
+        elif choice == '2':
+            links = list_links(browser, query)
+            url_link = link_select(links)
+            depth += 1
+            menu(browser, query, url_link, depth)
+        elif choice == '3':
+            depth -= 1
+            browser.quit()
+            return
 
 
 def main():
     print('Программа работает только с браузерами Chrome или Firefox. Проверьте их наличие')
     browser = check_browser_and_launch()
+    depth = 0
     if browser:
+        browser.get(URL)
         while True:
-            # Переход на сайт Википедии
-            browser.get(URL)
-            # Проверяем по заголовку, тот ли сайт открылся
-            assert "Википедия" in browser.title
-            search_query = input('Введите запрос: ')
-            if search_query.lower() == 'exit':
-                break
-            # Находим окно поиска
-            search_box = browser.find_element(By.ID, 'searchInput')
-            search_box.send_keys(question)
-            search_box.send_keys(Keys.RETURN)
-            input("Нажмите Enter, чтобы закрыть браузер...")
-            browser.quit()
+            query = input_query(browser, WORD_IN_URL)
+            menu(browser, query, URL, depth)
+            return
 
 
 if __name__ == '__main__':
