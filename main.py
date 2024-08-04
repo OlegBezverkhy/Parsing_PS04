@@ -10,10 +10,13 @@ URL = 'https://ru.wikipedia.org/wiki/Заглавная_страница'
 
 WORD_IN_URL = 'Википедия'
 
+# Глубина анализа страницы
 global depth
 
 
 def check_browser_and_launch():
+    ''' Определяет установленный браузер. Если это не Chrome или Firefox, то
+    сообщает об ошибке'''
     # Путь к Chrome
     chrome_path = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
     # Путь к Firefox
@@ -55,20 +58,24 @@ def get_paragraphs(browser, url, depth):
     else:
         paragraphs = browser.find_elements(By.TAG_NAME, 'p')
     for i, paragraph in enumerate(paragraphs):
-        if paragraph.text != '':
-            print(f'Параграф {i + 1}:\n {paragraph.text}\n')
-            next_par = input('Нажмите <Enter> для просмотра следующего параграфа или <q> для выхода\n')
-            if next_par == 'q':
-                break
+        print(f'Параграф {i + 1}:\n {paragraph.text}\n')
+        next_par = input('Нажмите <Enter> для просмотра следующего параграфа или <q> для выхода\n')
+        if next_par == 'q':
+            break
 
 
-def get_links(browser, query):
+def get_links(browser, query,depth):
     ''' Находит и возвращает список связанных ссылок на сайте,
-    которые содеожат текст запроса'''
+    которые содержат текст запроса'''
     links = browser.find_elements(By.TAG_NAME, 'a')
-    return [link.get_attribute('href')
-            for link in links
-            if link.get_attribute('href') and query in link.text]
+    if depth == 0:
+        return [link.get_attribute('href')
+                for link in links
+                if link.get_attribute('href') and query in link.text]
+    else:
+        return [link.get_attribute('href')
+                for link in links
+                if link.get_attribute('href')]
 
 
 def choice_action():
@@ -105,8 +112,8 @@ def input_query(browser, word):
         exit(1)
 
 
-def list_links(browser, query):
-    links = get_links(browser, query)
+def list_links(browser, query, depth):
+    links = get_links(browser, query, depth)
     if not links:
         print('Нет связанных статей')
         return
@@ -116,8 +123,8 @@ def list_links(browser, query):
     return links
 
 
-def link_select(links):
-    ''' Возвращает выбранную ссылку'''
+def link_select(browser, links):
+    ''' Возвращает выбранную ссылку или текущую если выбор не был сделан'''
     while True:
         linked_choice = input('Введите номер статьи для перехода (или <q> для возврата): ')
         try:
@@ -125,16 +132,17 @@ def link_select(links):
             if 0 <= linked_index < len(links):
                 url_link = links[linked_index]
                 break
-            elif linked_choice.lower() == 'q':
-                return None
             else:
                 print('Неверный ввод. Попробуйте снова.')
         except ValueError:
             print('Неверный ввод. Попробуйте снова.')
+        if linked_choice.lower() == 'q':
+            return browser.current_url
     return url_link
 
 
 def menu(browser, query, url_link, depth):
+    ''' Меню выбора действия пользователя'''
     if depth != 0:
         browser.get(url_link)
     while True:
@@ -143,8 +151,8 @@ def menu(browser, query, url_link, depth):
             current_url = browser.current_url
             get_paragraphs(browser, current_url, depth)
         elif choice == '2':
-            links = list_links(browser, query)
-            url_link = link_select(links)
+            links = list_links(browser, query, depth)
+            url_link = link_select(browser,links)
             depth += 1
             menu(browser, query, url_link, depth)
         elif choice == '3':
