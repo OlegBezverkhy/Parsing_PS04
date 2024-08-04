@@ -113,6 +113,7 @@ def input_query(browser, word):
 
 
 def list_links(browser, query, depth):
+    '''Печатает список ссылок на свзанные стстьи в человекочитаемом виде'''
     links = get_links(browser, query, depth)
     if not links:
         print('Нет связанных статей')
