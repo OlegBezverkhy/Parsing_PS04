@@ -43,7 +43,7 @@ def check_browser_and_launch():
             print(f'Ошибка при запуске Firefox: {er}')
     else:
         print('Ни один из браузеров (Chrome или Firefox) не найден.')
-        return None
+        exit(1)
 
 
 def get_paragraphs(browser, url, depth):
