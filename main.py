@@ -166,12 +166,11 @@ def main():
     print('Программа работает только с браузерами Chrome или Firefox. Проверьте их наличие')
     browser = check_browser_and_launch()
     depth = 0
-    if browser:
-        browser.get(URL)
-        while True:
-            query = input_query(browser, WORD_IN_URL)
-            menu(browser, query, URL, depth)
-            return
+    browser.get(URL)
+    while True:
+        query = input_query(browser, WORD_IN_URL)
+        menu(browser, query, URL, depth)
+        return
 
 
 if __name__ == '__main__':
